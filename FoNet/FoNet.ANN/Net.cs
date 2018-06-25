@@ -13,7 +13,7 @@ namespace FoNet.ANN
         private readonly IMathEngine _mathEngine = new CpuMathEngine();
         private readonly SynopsisMap _synopsisMap;
 
-        public Net(ActivationFunction activationFunction, params Layer[] layers)
+        public Net(Function activationFunction, params Layer[] layers)
         {
             ActivationFunction = activationFunction;
             Layers = layers;
@@ -27,7 +27,7 @@ namespace FoNet.ANN
         }
 
         public IList<Layer> Layers { get; set; }
-        public ActivationFunction ActivationFunction { get; }
+        public Function ActivationFunction { get; }
 
         public float[] Calculate(float[] input)
         {

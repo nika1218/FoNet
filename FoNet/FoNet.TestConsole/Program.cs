@@ -16,7 +16,7 @@ namespace FoNet
 
         static void Main(string[] args)
         {
-            var net = new Net(ActivationFunction.Sigmoid, new Layer(2), new Layer(4), new Layer(1));
+            var net = new Net(Function.Sigmoid, new Layer(2), new Layer(4), new Layer(1));
             TeachedNet(net);
 
             //net.Save(@"d:\temp\fonet.xml");

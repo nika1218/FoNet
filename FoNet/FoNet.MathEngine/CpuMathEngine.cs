@@ -74,6 +74,13 @@ namespace FoNet.MathEngine
             return vector;
         }
 
+        public float[] CorrectWeights(float[] vector, IDictionary<ushort, float[,]> matrices, float[] ideal,
+            Function activationFunction = Function.Linear)
+        {
+
+            return vector;
+        }
+
         #region Sigmoid
 
         public float[] Sigmoid(float[] vector)
