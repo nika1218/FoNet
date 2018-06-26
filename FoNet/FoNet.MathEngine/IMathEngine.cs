@@ -13,9 +13,5 @@ namespace FoNet.MathEngine
         float[] ApplyFunction(float[] vector, Function activationFunction);
         float[] ApplyDerivativeFunction(float[] vector, Function activationFunction);
         float[] ApplyIntegralFunction(float[] vector, Function activationFunction);
-
-        float[] Sigmoid(float[] vector);
-        float[] SigmoidDerivative(float[] vector);
-        float[] SigmoidIntegral(float[] vector);
     }
 }
