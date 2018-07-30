@@ -3,19 +3,24 @@ using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
 using FoNet.MathEngine;
+using FoNet.MathEngine.Functions;
 using FoNet.MathEngine.Primitives;
 
 namespace FoNet.ANN
 {
     public class Net
     {
-
         private readonly IMathEngine _mathEngine = new CpuMathEngine();
         private readonly SynopsisMap _synopsisMap;
 
         public Net(Function activationFunction, params Layer[] layers)
         {
-            ActivationFunction = activationFunction;
+            switch (activationFunction)
+            {
+                case Function.Sigmoid: ActivationFunction = new Sigmoid(); break;
+                default:  ActivationFunction = new Linear(); break;
+            }
+
             Layers = layers;
             _synopsisMap = new SynopsisMap(Layers.Select(l => l.NeuronsCount).ToArray());
             _synopsisMap.Fill();
@@ -27,7 +32,7 @@ namespace FoNet.ANN
         }
 
         public IList<Layer> Layers { get; set; }
-        public Function ActivationFunction { get; }
+        public IFunction ActivationFunction { get; }
 
         public float[] Calculate(float[] input)
         {
@@ -36,9 +41,9 @@ namespace FoNet.ANN
             return result;
         }
 
-        public void CorrectErrors(float[] deltas)
+        public float[] CorrectErrors(float epsilon, float[] vector, float[] ideal)
         {
-
+            return _mathEngine.CorrectWeightsIteration(epsilon, vector, _synopsisMap.GetWMaps(), _mathEngine.ApplyFunction(ideal, ActivationFunction), ActivationFunction);
         }
 
         public void Save(string path)

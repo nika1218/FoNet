@@ -41,6 +41,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CpuMathEngine.cs" />
+    <Compile Include="Functions\IFunction.cs" />
+    <Compile Include="Functions\Linear.cs" />
+    <Compile Include="Functions\Sigmoid.cs" />
+    <Compile Include="Functions\ThresholdValue.cs" />
     <Compile Include="IMathEngine.cs" />
     <Compile Include="Primitives\Function.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

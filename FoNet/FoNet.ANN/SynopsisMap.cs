@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace FoNet.ANN
@@ -42,7 +41,7 @@ namespace FoNet.ANN
                     for (int y = 0; y < layerMap.GetLength(1); y++)
                     {
                         // For the first layer all W=1
-                        layerMap[x, y] = i == 0 ? 1 : (float)rnd.NextDouble();
+                        layerMap[x, y] = i == 0 ? 1 : (float)rnd.NextDouble() * 6 - 3; // [-3;3]
                     }
                 }
             });

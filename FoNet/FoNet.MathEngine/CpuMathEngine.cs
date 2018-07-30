@@ -1,14 +1,16 @@
-﻿using System;
+﻿using FoNet.MathEngine.Functions;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using FoNet.MathEngine.Primitives;
 
 namespace FoNet.MathEngine
 {
     public class CpuMathEngine : IMathEngine
     {
-        public float[] Multiply(float[] vector, IDictionary<ushort, float[,]> matrices, Function activationFunction = Function.Linear)
+        public float[] Multiply(float[] vector, IDictionary<ushort, float[,]> matrices, IFunction activationFunction)
         {
+            activationFunction = activationFunction ?? new Linear();
+
             var currentVector = vector;
 
             foreach (var currentMatrix in matrices)
@@ -19,8 +21,10 @@ namespace FoNet.MathEngine
             return currentVector;
         }
 
-        public float[] Multiply(float[] vector, float[,] matrix, Function activationFunction = Function.Linear)
+        public float[] Multiply(float[] vector, float[,] matrix, IFunction activationFunction)
         {
+            activationFunction = activationFunction ?? new Linear();
+
             var xLength = matrix.GetLength(0);
             var yLength = matrix.GetLength(1);
 
@@ -32,8 +36,10 @@ namespace FoNet.MathEngine
             {
                 for (int x = 0; x < xLength; x++)
                 {
-                    result[y] += ApplyFunction(vector[x] * matrix[x, y], activationFunction);
+                    result[y] += vector[x] * matrix[x, y];
                 }
+
+                result[y] = activationFunction.Apply(result[y]);
             });
 
             return result;
@@ -55,106 +61,107 @@ namespace FoNet.MathEngine
 
         #region ApplyFunction
 
-        public float[] ApplyFunction(float[] vector, Function activationFunction)
+        public float[] ApplyFunction(float[] vector, IFunction activationFunction)
         {
+            activationFunction = activationFunction ?? new Linear();
+
             var result = new float[vector.Length];
-            Parallel.For(0, vector.Length, i => { result[i] = ApplyFunction(vector[i], activationFunction); });
-            return vector;
+            Parallel.For(0, vector.Length, i => { result[i] = activationFunction.Apply(vector[i]); });
+            return result;
         }
 
-        public float[] ApplyDerivativeFunction(float[] vector, Function activationFunction)
+        public float[] ApplyDerivativeFunction(float[] vector, IFunction activationFunction)
         {
+            activationFunction = activationFunction ?? new Linear();
+
             var result = new float[vector.Length];
-            Parallel.For(0, vector.Length,
-                i => { result[i] = ApplyDerivativeFunction(vector[i], activationFunction); });
-            return vector;
+            Parallel.For(0, vector.Length, i => { result[i] = activationFunction.Derevative(vector[i]); });
+            return result;
         }
 
-        public float[] ApplyIntegralFunction(float[] vector, Function activationFunction)
+        public float[] ApplyIntegralFunction(float[] vector, IFunction activationFunction)
         {
+            activationFunction = activationFunction ?? new Linear();
+
             var result = new float[vector.Length];
-            Parallel.For(0, vector.Length, i => { result[i] = ApplyIntegralFunction(vector[i], activationFunction); });
-            return vector;
-        }
-
-        public float ApplyFunction(float val, Function activationFunction)
-        {
-            if (activationFunction == Function.Sigmoid)
-            {
-                return 1 / (1 + (float)Math.Exp(val));
-            }
-
-            return val;
-        }
-
-        public float ApplyDerivativeFunction(float val, Function activationFunction)
-        {
-            if (activationFunction == Function.Sigmoid)
-            {
-                var sigm = ApplyFunction(val, Function.Sigmoid);
-                return sigm * (1 - sigm);
-            }
-
-            return val;
-        }
-
-        public float ApplyIntegralFunction(float val, Function activationFunction)
-        {
-            if (activationFunction == Function.Sigmoid)
-            {
-                return (float)Math.Log(1 + Math.Exp(val));
-            }
-
-            return val;
+            Parallel.For(0, vector.Length, i => { result[i] = activationFunction.Integral(vector[i]); });
+            return result;
         }
 
         #endregion
 
-        public float[] CorrectWeights(float[] vector, IDictionary<ushort, float[,]> matrices, float[] ideal,
-            Function activationFunction = Function.Linear)
+        public float[] CorrectWeightsIteration(float epsilon, float[] vector, IDictionary<ushort, float[,]> matrices, float[] ideal,
+            IFunction activationFunction)
         {
-            float[][] outputs = new float[matrices.Count][];
+            float[][] inputs = new float[matrices.Count][];
+            var linearFunction = new Linear();
 
             // forward pass
             var currentVector = vector;
             for (ushort i = 0; i < matrices.Count; i++)
             {
-                outputs[i] = Multiply(currentVector, matrices[i], activationFunction);
-                currentVector = outputs[i];
+                inputs[i] = Multiply(currentVector, matrices[i], linearFunction);
+                currentVector = ApplyFunction(inputs[i], activationFunction);
             }
 
-            var sigmaOut = SigmaOut(ideal, outputs[matrices.Count - 1], outputs[matrices.Count], activationFunction);
+            var errors = Errors(ideal, ApplyFunction(inputs[matrices.Count - 1], activationFunction));
 
-            for (ushort i = (ushort)matrices.Count; i > 0; i--)
+            var sigmaPrev = SigmaOut(ideal, inputs[matrices.Count - 1], activationFunction);
+
+            for (ushort i = (ushort)(matrices.Count - 1); i > 0; i--)
             {
-                var isLastLayer = i == matrices.Count;
+                var wMap = matrices[i];
+                var xLength = wMap.GetLength(0);
+                var input = inputs[i];
+                Parallel.For(0, sigmaPrev.Length, y =>
+                {
+                    for (var x = 0; x < xLength; x++)
+                    {
+                        var grad = activationFunction.Apply(input[y]) * sigmaPrev[y];
+                        wMap[x, y] += grad * epsilon;
+                    }
+                });
 
+                sigmaPrev = SigmaHidden(inputs[i - 1], matrices[i], sigmaPrev, activationFunction);
             }
 
-            return vector;
+            return errors;
         }
 
-        private float[] SigmaOut(float[] ideal, float[] input, float[] output, Function activationFunction)
+        private float[] SigmaOut(float[] ideal, float[] input, IFunction activationFunction)
         {
-            float[] sigmaOut = new float[output.Length];
+            activationFunction = activationFunction ?? new Linear();
 
-            var inputDerivative = ApplyDerivativeFunction(input, activationFunction);
+            float[] sigmaOut = new float[input.Length];
 
-            Parallel.For(0, sigmaOut.Length, i => { sigmaOut[i] = (ideal[i] - output[i]) * inputDerivative[i]; });
+            Parallel.For(0, sigmaOut.Length, i => { sigmaOut[i] = (ideal[i] - activationFunction.Apply(input[i])) * activationFunction.Derevative(input[i]); });
 
             return sigmaOut;
         }
 
-        private float[] SigmaHidden(float[] ideal, float[] input, float[] output, Function activationFunction)
+        private float[] SigmaHidden(float[] input, float[,] wMapOut, float[] sigmaPrev, IFunction activationFunction)
         {
-            float[] sigmaOut = new float[output.Length];
+            activationFunction = activationFunction ?? new Linear();
 
-            Parallel.For(0, sigmaOut.Length, i =>
+            var xLength = wMapOut.GetLength(0);
+            var yLength = wMapOut.GetLength(1);
+
+            if (xLength != input.Length) throw new ArgumentOutOfRangeException(nameof(wMapOut));
+            if (yLength != sigmaPrev.Length) throw new ArgumentOutOfRangeException(nameof(wMapOut));
+
+            float[] sigmaHidden = new float[xLength];
+
+            Parallel.For(0, xLength, x =>
             {
-                sigmaOut[i] = (ideal[i] - output[i]) * ApplyDerivativeFunction(input[i], activationFunction);
+                var sigmaSum = 0F;
+                for (var y = 0; y < yLength; y++)
+                {
+                    sigmaSum += wMapOut[x, y] * sigmaPrev[y];
+                }
+                sigmaHidden[x] = sigmaSum * activationFunction.Derevative(input[x]);
             });
 
-            return sigmaOut;
+            return sigmaHidden;
         }
     }
 }
